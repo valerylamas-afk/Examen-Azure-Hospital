@@ -1,0 +1,60 @@
+{
+	"name": "DF_Gold_Dim_Diagnostico",
+	"properties": {
+		"type": "MappingDataFlow",
+		"typeProperties": {
+			"sources": [
+				{
+					"dataset": {
+						"referenceName": "DS_Silver_Diagnoses",
+						"type": "DatasetReference"
+					},
+					"name": "OrigenSilverDiagnosticos"
+				}
+			],
+			"sinks": [
+				{
+					"dataset": {
+						"referenceName": "DS_Gold_Dim_Diagnostico",
+						"type": "DatasetReference"
+					},
+					"name": "DestinoGoldDimDiagnostico"
+				}
+			],
+			"transformations": [],
+			"scriptLines": [
+				"source(output(",
+				"          codigo_icd as string,",
+				"          descripcion_patologia as string,",
+				"          nivel_severidad as string",
+				"     ),",
+				"     allowSchemaDrift: true,",
+				"     validateSchema: false,",
+				"     isolationLevel: 'READ_UNCOMMITTED',",
+				"     query: 'SELECT DISTINCT\\n    TRIM(icd_code) AS codigo_icd,\\n    NULLIF(TRIM(diagnosis_description), \\'\\') AS descripcion_patologia,\\n    COALESCE(NULLIF(TRIM(severity), \\'\\'), \\'Sin especificar\\') AS nivel_severidad\\nFROM silver.diagnoses\\nWHERE NULLIF(TRIM(icd_code), \\'\\') IS NOT NULL',",
+				"     format: 'query') ~> OrigenSilverDiagnosticos",
+				"OrigenSilverDiagnosticos sink(allowSchemaDrift: true,",
+				"     validateSchema: false,",
+				"     input(",
+				"          diagnostico_key as integer,",
+				"          codigo_icd as string,",
+				"          descripcion_patologia as string,",
+				"          nivel_severidad as string",
+				"     ),",
+				"     deletable:false,",
+				"     insertable:true,",
+				"     updateable:false,",
+				"     upsertable:false,",
+				"     format: 'table',",
+				"     skipDuplicateMapInputs: true,",
+				"     skipDuplicateMapOutputs: true,",
+				"     errorHandlingOption: 'stopOnFirstError',",
+				"     mapColumn(",
+				"          codigo_icd,",
+				"          descripcion_patologia,",
+				"          nivel_severidad",
+				"     )) ~> DestinoGoldDimDiagnostico"
+			]
+		}
+	}
+}

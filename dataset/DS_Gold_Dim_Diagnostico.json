@@ -9,13 +9,21 @@
 		"type": "AzureSqlTable",
 		"schema": [
 			{
-				"name": "departamento_key",
+				"name": "diagnostico_key",
 				"type": "int",
 				"precision": 10
 			},
 			{
-				"name": "nombre_departamento",
+				"name": "codigo_icd",
+				"type": "varchar"
+			},
+			{
+				"name": "descripcion_patologia",
 				"type": "nvarchar"
+			},
+			{
+				"name": "nivel_severidad",
+				"type": "varchar"
 			}
 		],
 		"typeProperties": {
