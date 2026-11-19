@@ -254,6 +254,92 @@
 			]
 		},
 		{
+			"name": "[concat(parameters('factoryName'), '/DS_Bronze_Diagnoses')]",
+			"type": "Microsoft.DataFactory/factories/datasets",
+			"apiVersion": "2018-06-01",
+			"properties": {
+				"linkedServiceName": {
+					"referenceName": "LS_AzureSQL_Hospital",
+					"type": "LinkedServiceReference"
+				},
+				"annotations": [],
+				"type": "AzureSqlTable",
+				"schema": [
+					{
+						"name": "diagnosis_id",
+						"type": "nvarchar"
+					},
+					{
+						"name": "admission_id",
+						"type": "nvarchar"
+					},
+					{
+						"name": "icd_code",
+						"type": "nvarchar"
+					},
+					{
+						"name": "diagnosis_description",
+						"type": "nvarchar"
+					},
+					{
+						"name": "severity",
+						"type": "nvarchar"
+					}
+				],
+				"typeProperties": {
+					"schema": "bronze",
+					"table": "diagnoses"
+				}
+			},
+			"dependsOn": [
+				"[concat(variables('factoryId'), '/linkedServices/LS_AzureSQL_Hospital')]"
+			]
+		},
+		{
+			"name": "[concat(parameters('factoryName'), '/DS_Silver_Diagnoses')]",
+			"type": "Microsoft.DataFactory/factories/datasets",
+			"apiVersion": "2018-06-01",
+			"properties": {
+				"linkedServiceName": {
+					"referenceName": "LS_AzureSQL_Hospital",
+					"type": "LinkedServiceReference"
+				},
+				"annotations": [],
+				"type": "AzureSqlTable",
+				"schema": [
+					{
+						"name": "diagnosis_id",
+						"type": "int",
+						"precision": 10
+					},
+					{
+						"name": "admission_id",
+						"type": "int",
+						"precision": 10
+					},
+					{
+						"name": "icd_code",
+						"type": "varchar"
+					},
+					{
+						"name": "diagnosis_description",
+						"type": "nvarchar"
+					},
+					{
+						"name": "severity",
+						"type": "varchar"
+					}
+				],
+				"typeProperties": {
+					"schema": "silver",
+					"table": "diagnoses"
+				}
+			},
+			"dependsOn": [
+				"[concat(variables('factoryId'), '/linkedServices/LS_AzureSQL_Hospital')]"
+			]
+		},
+		{
 			"name": "[concat(parameters('factoryName'), '/DF_Silver_Patients')]",
 			"type": "Microsoft.DataFactory/factories/dataflows",
 			"apiVersion": "2018-06-01",
@@ -475,6 +561,115 @@
 			]
 		},
 		{
+			"name": "[concat(parameters('factoryName'), '/DF_Silver_Diagnoses')]",
+			"type": "Microsoft.DataFactory/factories/dataflows",
+			"apiVersion": "2018-06-01",
+			"properties": {
+				"type": "MappingDataFlow",
+				"typeProperties": {
+					"sources": [
+						{
+							"dataset": {
+								"referenceName": "DS_Bronze_Diagnoses",
+								"type": "DatasetReference"
+							},
+							"name": "OrigenBronzeDiagnoses"
+						},
+						{
+							"dataset": {
+								"referenceName": "DS_Silver_Admissions",
+								"type": "DatasetReference"
+							},
+							"name": "OrigenSilverAdmissions"
+						}
+					],
+					"sinks": [
+						{
+							"dataset": {
+								"referenceName": "DS_Silver_Diagnoses",
+								"type": "DatasetReference"
+							},
+							"name": "DestinoSilverDiagnoses"
+						}
+					],
+					"transformations": [
+						{
+							"name": "LimpiarDiagnoses"
+						},
+						{
+							"name": "FiltrarDiagnoses"
+						},
+						{
+							"name": "ValidarAdmissionDiagnoses"
+						}
+					],
+					"scriptLines": [
+						"source(output(",
+						"          diagnosis_id as string,",
+						"          admission_id as string,",
+						"          icd_code as string,",
+						"          diagnosis_description as string,",
+						"          severity as string",
+						"     ),",
+						"     allowSchemaDrift: true,",
+						"     validateSchema: false,",
+						"     isolationLevel: 'READ_UNCOMMITTED',",
+						"     format: 'table') ~> OrigenBronzeDiagnoses",
+						"source(output(",
+						"          admission_id as integer,",
+						"          patient_id as integer,",
+						"          admission_date as date,",
+						"          discharge_date as date,",
+						"          department as string,",
+						"          attending_doctor_id as integer",
+						"     ),",
+						"     allowSchemaDrift: true,",
+						"     validateSchema: false,",
+						"     isolationLevel: 'READ_UNCOMMITTED',",
+						"     format: 'table') ~> OrigenSilverAdmissions",
+						"OrigenBronzeDiagnoses derive(admission_id = toInteger(admission_id),",
+						"          diagnosis_id = toInteger(diagnosis_id),",
+						"          icd_code = upper(trim(icd_code)),",
+						"          diagnosis_description = trim(diagnosis_description),",
+						"          severity = initCap(trim(severity))) ~> LimpiarDiagnoses",
+						"LimpiarDiagnoses filter(!isNull(diagnosis_id) && !isNull(admission_id)) ~> FiltrarDiagnoses",
+						"FiltrarDiagnoses, OrigenSilverAdmissions exists(LimpiarDiagnoses@admission_id == OrigenSilverAdmissions@admission_id,",
+						"     negate:false,",
+						"     broadcast: 'auto')~> ValidarAdmissionDiagnoses",
+						"ValidarAdmissionDiagnoses sink(allowSchemaDrift: true,",
+						"     validateSchema: false,",
+						"     input(",
+						"          diagnosis_id as integer,",
+						"          admission_id as integer,",
+						"          icd_code as string,",
+						"          diagnosis_description as string,",
+						"          severity as string",
+						"     ),",
+						"     deletable:false,",
+						"     insertable:true,",
+						"     updateable:false,",
+						"     upsertable:false,",
+						"     format: 'table',",
+						"     skipDuplicateMapInputs: true,",
+						"     skipDuplicateMapOutputs: true,",
+						"     errorHandlingOption: 'stopOnFirstError',",
+						"     mapColumn(",
+						"          diagnosis_id,",
+						"          admission_id,",
+						"          icd_code,",
+						"          diagnosis_description,",
+						"          severity",
+						"     )) ~> DestinoSilverDiagnoses"
+					]
+				}
+			},
+			"dependsOn": [
+				"[concat(variables('factoryId'), '/datasets/DS_Bronze_Diagnoses')]",
+				"[concat(variables('factoryId'), '/datasets/DS_Silver_Admissions')]",
+				"[concat(variables('factoryId'), '/datasets/DS_Silver_Diagnoses')]"
+			]
+		},
+		{
 			"name": "[concat(parameters('factoryName'), '/PL_Silver_Patients')]",
 			"type": "Microsoft.DataFactory/factories/pipelines",
 			"apiVersion": "2018-06-01",
@@ -565,6 +760,53 @@
 			},
 			"dependsOn": [
 				"[concat(variables('factoryId'), '/dataflows/DF_Silver_Admissions')]"
+			]
+		},
+		{
+			"name": "[concat(parameters('factoryName'), '/PL_Silver_Diagnoses')]",
+			"type": "Microsoft.DataFactory/factories/pipelines",
+			"apiVersion": "2018-06-01",
+			"properties": {
+				"activities": [
+					{
+						"name": "CargarSilverDiagnoses",
+						"type": "ExecuteDataFlow",
+						"dependsOn": [],
+						"policy": {
+							"timeout": "0.12:00:00",
+							"retry": 0,
+							"retryIntervalInSeconds": 30,
+							"secureOutput": false,
+							"secureInput": false
+						},
+						"userProperties": [],
+						"typeProperties": {
+							"dataflow": {
+								"referenceName": "DF_Silver_Diagnoses",
+								"type": "DataFlowReference",
+								"parameters": {},
+								"datasetParameters": {
+									"OrigenBronzeDiagnoses": {},
+									"OrigenSilverAdmissions": {},
+									"DestinoSilverDiagnoses": {}
+								}
+							},
+							"staging": {},
+							"compute": {
+								"coreCount": 8,
+								"computeType": "General"
+							},
+							"traceLevel": "Fine"
+						}
+					}
+				],
+				"policy": {
+					"elapsedTimeMetric": {}
+				},
+				"annotations": []
+			},
+			"dependsOn": [
+				"[concat(variables('factoryId'), '/dataflows/DF_Silver_Diagnoses')]"
 			]
 		}
 	]
