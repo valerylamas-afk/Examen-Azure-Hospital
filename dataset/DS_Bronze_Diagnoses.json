@@ -1,0 +1,37 @@
+{
+	"name": "DS_Bronze_Diagnoses",
+	"properties": {
+		"linkedServiceName": {
+			"referenceName": "LS_AzureSQL_Hospital",
+			"type": "LinkedServiceReference"
+		},
+		"annotations": [],
+		"type": "AzureSqlTable",
+		"schema": [
+			{
+				"name": "diagnosis_id",
+				"type": "nvarchar"
+			},
+			{
+				"name": "admission_id",
+				"type": "nvarchar"
+			},
+			{
+				"name": "icd_code",
+				"type": "nvarchar"
+			},
+			{
+				"name": "diagnosis_description",
+				"type": "nvarchar"
+			},
+			{
+				"name": "severity",
+				"type": "nvarchar"
+			}
+		],
+		"typeProperties": {
+			"schema": "bronze",
+			"table": "diagnoses"
+		}
+	}
+}

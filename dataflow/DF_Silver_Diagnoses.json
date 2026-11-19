@@ -1,0 +1,102 @@
+{
+	"name": "DF_Silver_Diagnoses",
+	"properties": {
+		"type": "MappingDataFlow",
+		"typeProperties": {
+			"sources": [
+				{
+					"dataset": {
+						"referenceName": "DS_Bronze_Diagnoses",
+						"type": "DatasetReference"
+					},
+					"name": "OrigenBronzeDiagnoses"
+				},
+				{
+					"dataset": {
+						"referenceName": "DS_Silver_Admissions",
+						"type": "DatasetReference"
+					},
+					"name": "OrigenSilverAdmissions"
+				}
+			],
+			"sinks": [
+				{
+					"dataset": {
+						"referenceName": "DS_Silver_Diagnoses",
+						"type": "DatasetReference"
+					},
+					"name": "DestinoSilverDiagnoses"
+				}
+			],
+			"transformations": [
+				{
+					"name": "LimpiarDiagnoses"
+				},
+				{
+					"name": "FiltrarDiagnoses"
+				},
+				{
+					"name": "ValidarAdmissionDiagnoses"
+				}
+			],
+			"scriptLines": [
+				"source(output(",
+				"          diagnosis_id as string,",
+				"          admission_id as string,",
+				"          icd_code as string,",
+				"          diagnosis_description as string,",
+				"          severity as string",
+				"     ),",
+				"     allowSchemaDrift: true,",
+				"     validateSchema: false,",
+				"     isolationLevel: 'READ_UNCOMMITTED',",
+				"     format: 'table') ~> OrigenBronzeDiagnoses",
+				"source(output(",
+				"          admission_id as integer,",
+				"          patient_id as integer,",
+				"          admission_date as date,",
+				"          discharge_date as date,",
+				"          department as string,",
+				"          attending_doctor_id as integer",
+				"     ),",
+				"     allowSchemaDrift: true,",
+				"     validateSchema: false,",
+				"     isolationLevel: 'READ_UNCOMMITTED',",
+				"     format: 'table') ~> OrigenSilverAdmissions",
+				"OrigenBronzeDiagnoses derive(admission_id = toInteger(admission_id),",
+				"          diagnosis_id = toInteger(diagnosis_id),",
+				"          icd_code = upper(trim(icd_code)),",
+				"          diagnosis_description = trim(diagnosis_description),",
+				"          severity = initCap(trim(severity))) ~> LimpiarDiagnoses",
+				"LimpiarDiagnoses filter(!isNull(diagnosis_id) && !isNull(admission_id)) ~> FiltrarDiagnoses",
+				"FiltrarDiagnoses, OrigenSilverAdmissions exists(LimpiarDiagnoses@admission_id == OrigenSilverAdmissions@admission_id,",
+				"     negate:false,",
+				"     broadcast: 'auto')~> ValidarAdmissionDiagnoses",
+				"ValidarAdmissionDiagnoses sink(allowSchemaDrift: true,",
+				"     validateSchema: false,",
+				"     input(",
+				"          diagnosis_id as integer,",
+				"          admission_id as integer,",
+				"          icd_code as string,",
+				"          diagnosis_description as string,",
+				"          severity as string",
+				"     ),",
+				"     deletable:false,",
+				"     insertable:true,",
+				"     updateable:false,",
+				"     upsertable:false,",
+				"     format: 'table',",
+				"     skipDuplicateMapInputs: true,",
+				"     skipDuplicateMapOutputs: true,",
+				"     errorHandlingOption: 'stopOnFirstError',",
+				"     mapColumn(",
+				"          diagnosis_id,",
+				"          admission_id,",
+				"          icd_code,",
+				"          diagnosis_description,",
+				"          severity",
+				"     )) ~> DestinoSilverDiagnoses"
+			]
+		}
+	}
+}
