@@ -1,0 +1,299 @@
+{
+	"$schema": "http://schema.management.azure.com/schemas/2015-01-01/deploymentTemplate.json#",
+	"contentVersion": "1.0.0.0",
+	"parameters": {
+		"factoryName": {
+			"type": "string",
+			"metadata": "Nombre de instancia de Data Factory",
+			"defaultValue": "adf-ucb-hospital-vl2026"
+		},
+		"LS_AzureSQL_Hospital_password": {
+			"type": "secureString",
+			"metadata": "Cadena protegida para \"password\"de \"LS_AzureSQL_Hospital\""
+		},
+		"LS_AzureSQL_Hospital_properties_typeProperties_server": {
+			"type": "string",
+			"defaultValue": "sql-ucb-hospital-vl-central2026.database.windows.net"
+		},
+		"LS_AzureSQL_Hospital_properties_typeProperties_database": {
+			"type": "string",
+			"defaultValue": "dw_hospital"
+		},
+		"LS_AzureSQL_Hospital_properties_typeProperties_userName": {
+			"type": "string",
+			"defaultValue": "franklin"
+		}
+	},
+	"variables": {
+		"factoryId": "[concat('Microsoft.DataFactory/factories/', parameters('factoryName'))]"
+	},
+	"resources": [
+		{
+			"name": "[concat(parameters('factoryName'), '/LS_AzureSQL_Hospital')]",
+			"type": "Microsoft.DataFactory/factories/linkedServices",
+			"apiVersion": "2018-06-01",
+			"properties": {
+				"annotations": [],
+				"type": "AzureSqlDatabase",
+				"typeProperties": {
+					"server": "[parameters('LS_AzureSQL_Hospital_properties_typeProperties_server')]",
+					"database": "[parameters('LS_AzureSQL_Hospital_properties_typeProperties_database')]",
+					"encrypt": "mandatory",
+					"trustServerCertificate": false,
+					"authenticationType": "SQL",
+					"userName": "[parameters('LS_AzureSQL_Hospital_properties_typeProperties_userName')]",
+					"password": {
+						"type": "SecureString",
+						"value": "[parameters('LS_AzureSQL_Hospital_password')]"
+					}
+				}
+			},
+			"dependsOn": []
+		},
+		{
+			"name": "[concat(parameters('factoryName'), '/DS_Bronze_Patients')]",
+			"type": "Microsoft.DataFactory/factories/datasets",
+			"apiVersion": "2018-06-01",
+			"properties": {
+				"linkedServiceName": {
+					"referenceName": "LS_AzureSQL_Hospital",
+					"type": "LinkedServiceReference"
+				},
+				"annotations": [],
+				"type": "AzureSqlTable",
+				"schema": [
+					{
+						"name": "patient_id",
+						"type": "nvarchar"
+					},
+					{
+						"name": "full_name",
+						"type": "nvarchar"
+					},
+					{
+						"name": "gender",
+						"type": "nvarchar"
+					},
+					{
+						"name": "date_of_birth",
+						"type": "nvarchar"
+					},
+					{
+						"name": "phone",
+						"type": "nvarchar"
+					},
+					{
+						"name": "email",
+						"type": "nvarchar"
+					},
+					{
+						"name": "address",
+						"type": "nvarchar"
+					},
+					{
+						"name": "insurance_provider",
+						"type": "nvarchar"
+					}
+				],
+				"typeProperties": {
+					"schema": "bronze",
+					"table": "patients"
+				}
+			},
+			"dependsOn": [
+				"[concat(variables('factoryId'), '/linkedServices/LS_AzureSQL_Hospital')]"
+			]
+		},
+		{
+			"name": "[concat(parameters('factoryName'), '/DS_Silver_Patients')]",
+			"type": "Microsoft.DataFactory/factories/datasets",
+			"apiVersion": "2018-06-01",
+			"properties": {
+				"linkedServiceName": {
+					"referenceName": "LS_AzureSQL_Hospital",
+					"type": "LinkedServiceReference"
+				},
+				"annotations": [],
+				"type": "AzureSqlTable",
+				"schema": [
+					{
+						"name": "patient_id",
+						"type": "nvarchar"
+					},
+					{
+						"name": "full_name",
+						"type": "nvarchar"
+					},
+					{
+						"name": "gender",
+						"type": "nvarchar"
+					},
+					{
+						"name": "date_of_birth",
+						"type": "nvarchar"
+					},
+					{
+						"name": "phone",
+						"type": "nvarchar"
+					},
+					{
+						"name": "email",
+						"type": "nvarchar"
+					},
+					{
+						"name": "address",
+						"type": "nvarchar"
+					},
+					{
+						"name": "insurance_provider",
+						"type": "nvarchar"
+					}
+				],
+				"typeProperties": {
+					"schema": "bronze",
+					"table": "patients"
+				}
+			},
+			"dependsOn": [
+				"[concat(variables('factoryId'), '/linkedServices/LS_AzureSQL_Hospital')]"
+			]
+		},
+		{
+			"name": "[concat(parameters('factoryName'), '/DF_Silver_Patients')]",
+			"type": "Microsoft.DataFactory/factories/dataflows",
+			"apiVersion": "2018-06-01",
+			"properties": {
+				"type": "MappingDataFlow",
+				"typeProperties": {
+					"sources": [
+						{
+							"dataset": {
+								"referenceName": "DS_Bronze_Patients",
+								"type": "DatasetReference"
+							},
+							"name": "OrigenBronzePatients"
+						}
+					],
+					"sinks": [
+						{
+							"dataset": {
+								"referenceName": "DS_Silver_Patients",
+								"type": "DatasetReference"
+							},
+							"name": "DestinoSilverPatients"
+						}
+					],
+					"transformations": [
+						{
+							"name": "LimpiarPacientes"
+						}
+					],
+					"scriptLines": [
+						"source(output(",
+						"          patient_id as string,",
+						"          full_name as string,",
+						"          gender as string,",
+						"          date_of_birth as string,",
+						"          phone as string,",
+						"          email as string,",
+						"          address as string,",
+						"          insurance_provider as string",
+						"     ),",
+						"     allowSchemaDrift: true,",
+						"     validateSchema: false,",
+						"     isolationLevel: 'READ_UNCOMMITTED',",
+						"     format: 'table') ~> OrigenBronzePatients",
+						"OrigenBronzePatients derive(patient_id = toInteger(patient_id),",
+						"          full_name = trim(full_name),",
+						"          gender = iif(     lower(trim(gender)) == 'm' || lower(trim(gender)) == 'male',     'M',     iif(         lower(trim(gender)) == 'f' || lower(trim(gender)) == 'female',         'F',         gender     ) ),",
+						"          date_of_birth = iif(     regexMatch(trim(date_of_birth), '^[0-9]{2}-[0-9]{2}-[0-9]{2}$'),     toDate(         concat(             iif(toInteger(right(trim(date_of_birth), 2)) <= 26, '20', '19'),             right(trim(date_of_birth), 2),             '-',             left(trim(date_of_birth), 2),             '-',             substring(trim(date_of_birth), 4, 2)         ),         'yyyy-MM-dd'     ),     coalesce(         toDate(date_of_birth, 'yyyy-MM-dd'),         toDate(date_of_birth, 'MMMM dd, yyyy'),         toDate(date_of_birth, 'MMM dd, yyyy'),         toDate(date_of_birth, 'MM-dd-yyyy'),         toDate(date_of_birth, 'dd-MMM-yyyy'),         toDate(date_of_birth, 'MM/dd/yyyy')     ) ),",
+						"          phone = trim(phone),",
+						"          email = lower(trim(email)),",
+						"          address = trim(address),",
+						"          insurance_provider = trim(insurance_provider)) ~> LimpiarPacientes",
+						"LimpiarPacientes sink(allowSchemaDrift: true,",
+						"     validateSchema: false,",
+						"     input(",
+						"          patient_id as string,",
+						"          full_name as string,",
+						"          gender as string,",
+						"          date_of_birth as string,",
+						"          phone as string,",
+						"          email as string,",
+						"          address as string,",
+						"          insurance_provider as string",
+						"     ),",
+						"     deletable:false,",
+						"     insertable:true,",
+						"     updateable:false,",
+						"     upsertable:false,",
+						"     format: 'table',",
+						"     skipDuplicateMapInputs: true,",
+						"     skipDuplicateMapOutputs: true,",
+						"     errorHandlingOption: 'stopOnFirstError',",
+						"     mapColumn(",
+						"          patient_id,",
+						"          full_name,",
+						"          gender,",
+						"          date_of_birth,",
+						"          phone,",
+						"          email,",
+						"          address,",
+						"          insurance_provider",
+						"     )) ~> DestinoSilverPatients"
+					]
+				}
+			},
+			"dependsOn": [
+				"[concat(variables('factoryId'), '/datasets/DS_Bronze_Patients')]",
+				"[concat(variables('factoryId'), '/datasets/DS_Silver_Patients')]"
+			]
+		},
+		{
+			"name": "[concat(parameters('factoryName'), '/PL_Silver_Patients')]",
+			"type": "Microsoft.DataFactory/factories/pipelines",
+			"apiVersion": "2018-06-01",
+			"properties": {
+				"activities": [
+					{
+						"name": "CargarSilverPatients",
+						"type": "ExecuteDataFlow",
+						"dependsOn": [],
+						"policy": {
+							"timeout": "0.12:00:00",
+							"retry": 0,
+							"retryIntervalInSeconds": 30,
+							"secureOutput": false,
+							"secureInput": false
+						},
+						"userProperties": [],
+						"typeProperties": {
+							"dataflow": {
+								"referenceName": "DF_Silver_Patients",
+								"type": "DataFlowReference",
+								"parameters": {},
+								"datasetParameters": {
+									"OrigenBronzePatients": {},
+									"DestinoSilverPatients": {}
+								}
+							},
+							"staging": {},
+							"compute": {
+								"coreCount": 8,
+								"computeType": "General"
+							},
+							"traceLevel": "Fine"
+						}
+					}
+				],
+				"policy": {
+					"elapsedTimeMetric": {}
+				},
+				"annotations": []
+			},
+			"dependsOn": [
+				"[concat(variables('factoryId'), '/dataflows/DF_Silver_Patients')]"
+			]
+		}
+	]
+}

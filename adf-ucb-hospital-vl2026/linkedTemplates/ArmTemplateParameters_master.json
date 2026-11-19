@@ -1,0 +1,27 @@
+{
+	"$schema": "https://schema.management.azure.com/schemas/2015-01-01/deploymentParameters.json#",
+	"contentVersion": "1.0.0.0",
+	"parameters": {
+		"factoryName": {
+			"value": "adf-ucb-hospital-vl2026"
+		},
+		"LS_AzureSQL_Hospital_password": {
+			"value": ""
+		},
+		"LS_AzureSQL_Hospital_properties_typeProperties_server": {
+			"value": "sql-ucb-hospital-vl-central2026.database.windows.net"
+		},
+		"LS_AzureSQL_Hospital_properties_typeProperties_database": {
+			"value": "dw_hospital"
+		},
+		"LS_AzureSQL_Hospital_properties_typeProperties_userName": {
+			"value": "franklin"
+		},
+		"containerUri": {
+			"value": ""
+		},
+		"containerSasToken": {
+			"value": ""
+		}
+	}
+}
