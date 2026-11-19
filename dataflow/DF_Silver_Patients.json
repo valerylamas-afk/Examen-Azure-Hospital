@@ -44,7 +44,7 @@
 				"OrigenBronzePatients derive(patient_id = toInteger(patient_id),",
 				"          full_name = trim(full_name),",
 				"          gender = iif(     lower(trim(gender)) == 'm' || lower(trim(gender)) == 'male',     'M',     iif(         lower(trim(gender)) == 'f' || lower(trim(gender)) == 'female',         'F',         gender     ) ),",
-				"          date_of_birth = toDate(date_of_birth),",
+				"          date_of_birth = iif(     regexMatch(trim(date_of_birth), '^[0-9]{2}-[0-9]{2}-[0-9]{2}$'),     toDate(         concat(             iif(toInteger(right(trim(date_of_birth), 2)) <= 26, '20', '19'),             right(trim(date_of_birth), 2),             '-',             left(trim(date_of_birth), 2),             '-',             substring(trim(date_of_birth), 4, 2)         ),         'yyyy-MM-dd'     ),     coalesce(         toDate(date_of_birth, 'yyyy-MM-dd'),         toDate(date_of_birth, 'MMMM dd, yyyy'),         toDate(date_of_birth, 'MMM dd, yyyy'),         toDate(date_of_birth, 'MM-dd-yyyy'),         toDate(date_of_birth, 'dd-MMM-yyyy'),         toDate(date_of_birth, 'MM/dd/yyyy')     ) ),",
 				"          phone = trim(phone),",
 				"          email = lower(trim(email)),",
 				"          address = trim(address),",
