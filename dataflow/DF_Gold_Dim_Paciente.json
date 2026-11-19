@@ -1,0 +1,94 @@
+{
+	"name": "DF_Gold_Dim_Paciente",
+	"properties": {
+		"type": "MappingDataFlow",
+		"typeProperties": {
+			"sources": [
+				{
+					"dataset": {
+						"referenceName": "DS_Silver_Patients",
+						"type": "DatasetReference"
+					},
+					"name": "OrigenSilverPacientes"
+				}
+			],
+			"sinks": [
+				{
+					"dataset": {
+						"referenceName": "DS_Gold_Dim_Paciente",
+						"type": "DatasetReference"
+					},
+					"name": "DestinoGoldDimPaciente"
+				}
+			],
+			"transformations": [
+				{
+					"name": "DerivarEdad"
+				},
+				{
+					"name": "CrearColumnasDimPaciente"
+				},
+				{
+					"name": "ConvertirFechaNacimiento"
+				}
+			],
+			"scriptLines": [
+				"source(output(",
+				"          patient_id as string,",
+				"          full_name as string,",
+				"          gender as string,",
+				"          date_of_birth as string,",
+				"          phone as string,",
+				"          email as string,",
+				"          address as string,",
+				"          insurance_provider as string",
+				"     ),",
+				"     allowSchemaDrift: true,",
+				"     validateSchema: false,",
+				"     isolationLevel: 'READ_UNCOMMITTED',",
+				"     format: 'table') ~> OrigenSilverPacientes",
+				"ConvertirFechaNacimiento derive(edad = year(currentDate()) - year(date_of_birth) - iif(month(currentDate()) * 100 + dayOfMonth(currentDate()) < month(date_of_birth) * 100 + dayOfMonth(date_of_birth), 1, 0)) ~> DerivarEdad",
+				"DerivarEdad derive(patient_id_bk = toInteger(patient_id),",
+				"          nombre_completo = trim(full_name),",
+				"          genero = case(in(['m','male','masculino'], lower(trim(gender))), 'Masculino', in(['f','female','femenino'], lower(trim(gender))), 'Femenino', 'Otro'),",
+				"          fecha_nacimiento = date_of_birth,",
+				"          rango_etario = case(isNull(edad), toString(null()), edad <= 18, '0-18', edad <= 35, '19-35', edad <= 60, '36-60', '60+'),",
+				"          {correo_electronico } = trim(email),",
+				"          direccion = trim(address),",
+				"          proveedor_seguro = iif(isNull(insurance_provider), 'Sin seguro', iif(trim(insurance_provider) == '', 'Sin seguro', trim(insurance_provider)))) ~> CrearColumnasDimPaciente",
+				"OrigenSilverPacientes derive(date_of_birth = toDate(date_of_birth, 'yyyy-MM-dd')) ~> ConvertirFechaNacimiento",
+				"CrearColumnasDimPaciente sink(allowSchemaDrift: true,",
+				"     validateSchema: false,",
+				"     input(",
+				"          paciente_key as integer,",
+				"          patient_id_bk as integer,",
+				"          nombre_completo as string,",
+				"          genero as string,",
+				"          fecha_nacimiento as date,",
+				"          rango_etario as string,",
+				"          correo_electronico as string,",
+				"          direccion as string,",
+				"          proveedor_seguro as string",
+				"     ),",
+				"     deletable:false,",
+				"     insertable:true,",
+				"     updateable:false,",
+				"     upsertable:false,",
+				"     format: 'table',",
+				"     skipDuplicateMapInputs: true,",
+				"     skipDuplicateMapOutputs: true,",
+				"     errorHandlingOption: 'stopOnFirstError',",
+				"     mapColumn(",
+				"          patient_id_bk,",
+				"          nombre_completo,",
+				"          genero,",
+				"          fecha_nacimiento,",
+				"          rango_etario,",
+				"          correo_electronico = {correo_electronico },",
+				"          direccion,",
+				"          proveedor_seguro",
+				"     )) ~> DestinoGoldDimPaciente"
+			]
+		}
+	}
+}
