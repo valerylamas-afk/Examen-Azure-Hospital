@@ -1,0 +1,596 @@
+{
+	"$schema": "http://schema.management.azure.com/schemas/2015-01-01/deploymentTemplate.json#",
+	"contentVersion": "1.0.0.0",
+	"parameters": {
+		"factoryName": {
+			"type": "string",
+			"metadata": "Nombre de instancia de Data Factory",
+			"defaultValue": "adf-ucb-hospital-vl2026"
+		}
+	},
+	"variables": {
+		"factoryId": "[concat('Microsoft.DataFactory/factories/', parameters('factoryName'))]"
+	},
+	"resources": [
+		{
+			"name": "[concat(parameters('factoryName'), '/DF_Silver_Billing')]",
+			"type": "Microsoft.DataFactory/factories/dataflows",
+			"apiVersion": "2018-06-01",
+			"properties": {
+				"type": "MappingDataFlow",
+				"typeProperties": {
+					"sources": [
+						{
+							"dataset": {
+								"referenceName": "DS_Bronze_Billing",
+								"type": "DatasetReference"
+							},
+							"name": "OrigenBronzeBilling"
+						},
+						{
+							"dataset": {
+								"referenceName": "DS_Silver_Admissions",
+								"type": "DatasetReference"
+							},
+							"name": "OrigenSilverAdmissions"
+						}
+					],
+					"sinks": [
+						{
+							"dataset": {
+								"referenceName": "DS_Silver_Billing",
+								"type": "DatasetReference"
+							},
+							"name": "DestinoBilling"
+						}
+					],
+					"transformations": [
+						{
+							"name": "LimpiarBilling"
+						},
+						{
+							"name": "FiltrarBilling"
+						},
+						{
+							"name": "ValidarAdmissionBilling"
+						}
+					],
+					"scriptLines": [
+						"source(output(",
+						"          billing_id as string,",
+						"          admission_id as string,",
+						"          charge_type as string,",
+						"          amount as string,",
+						"          payment_status as string,",
+						"          payment_date as string",
+						"     ),",
+						"     allowSchemaDrift: true,",
+						"     validateSchema: false,",
+						"     isolationLevel: 'READ_UNCOMMITTED',",
+						"     format: 'table') ~> OrigenBronzeBilling",
+						"source(output(",
+						"          admission_id as integer,",
+						"          patient_id as integer,",
+						"          admission_date as date,",
+						"          discharge_date as date,",
+						"          department as string,",
+						"          attending_doctor_id as integer",
+						"     ),",
+						"     allowSchemaDrift: true,",
+						"     validateSchema: false,",
+						"     isolationLevel: 'READ_UNCOMMITTED',",
+						"     format: 'table') ~> OrigenSilverAdmissions",
+						"OrigenBronzeBilling derive(billing_id = toInteger(billing_id),",
+						"          admission_id = toInteger(admission_id),",
+						"          charge_type = trim(charge_type),",
+						"          payment_status = upper(trim(payment_status)),",
+						"          amount = toDecimal(     replace(         replace(             replace(                 replace(trim(amount), 'USD', ''),                 '$', ''             ),             ',', ''         ),         ' ', ''     ),     18,     2 ),",
+						"          {payment_date¿} = iif(     isNull(payment_date),     toDate(null()),     iif(         regexMatch(payment_date, '^[0-9]{4}-[0-9]{2}-[0-9]{2}$'),         toDate(payment_date, 'yyyy-MM-dd'),         iif(             regexMatch(payment_date, '^[0-9]{2}/[0-9]{2}/[0-9]{4}$'),             toDate(payment_date, 'MM/dd/yyyy'),             iif(                 regexMatch(payment_date, '^[0-9]{2}-[0-9]{2}-[0-9]{2}$'),                 toDate(payment_date, 'MM-dd-yy'),                 iif(                     regexMatch(payment_date, '^[0-9]{2}-[A-Za-z]{3}-[0-9]{4}$'),                     toDate(payment_date, 'dd-MMM-yyyy'),                     toDate(payment_date, 'MMMM dd, yyyy')                 )             )         )     ) )) ~> LimpiarBilling",
+						"LimpiarBilling filter(!isNull(billing_id)",
+						"&& !isNull(admission_id)",
+						"&& !isNull(amount)",
+						"&& !isNull(charge_type)",
+						"&& !isNull(payment_status)) ~> FiltrarBilling",
+						"FiltrarBilling, OrigenSilverAdmissions exists(LimpiarBilling@admission_id == OrigenSilverAdmissions@admission_id,",
+						"     negate:false,",
+						"     broadcast: 'auto')~> ValidarAdmissionBilling",
+						"ValidarAdmissionBilling sink(allowSchemaDrift: true,",
+						"     validateSchema: false,",
+						"     input(",
+						"          billing_id as integer,",
+						"          admission_id as integer,",
+						"          charge_type as string,",
+						"          amount as decimal(12,2),",
+						"          payment_status as string,",
+						"          payment_date as date",
+						"     ),",
+						"     deletable:false,",
+						"     insertable:true,",
+						"     updateable:false,",
+						"     upsertable:false,",
+						"     format: 'table',",
+						"     skipDuplicateMapInputs: true,",
+						"     skipDuplicateMapOutputs: true,",
+						"     errorHandlingOption: 'stopOnFirstError',",
+						"     mapColumn(",
+						"          billing_id,",
+						"          admission_id,",
+						"          charge_type,",
+						"          amount,",
+						"          payment_status,",
+						"          payment_date = {payment_date¿}",
+						"     )) ~> DestinoBilling"
+					]
+				}
+			},
+			"dependsOn": []
+		},
+		{
+			"name": "[concat(parameters('factoryName'), '/DF_Gold_Dim_Fecha')]",
+			"type": "Microsoft.DataFactory/factories/dataflows",
+			"apiVersion": "2018-06-01",
+			"properties": {
+				"type": "MappingDataFlow",
+				"typeProperties": {
+					"sources": [
+						{
+							"dataset": {
+								"referenceName": "DS_Silver_Admissions_Gold",
+								"type": "DatasetReference"
+							},
+							"name": "OrigenSilverFechas"
+						}
+					],
+					"sinks": [
+						{
+							"dataset": {
+								"referenceName": "DS_Gold_Dim_Fecha",
+								"type": "DatasetReference"
+							},
+							"name": "DestinoGoldDimFecha"
+						}
+					],
+					"transformations": [
+						{
+							"name": "CrearColumnasDimFecha"
+						}
+					],
+					"scriptLines": [
+						"source(output(",
+						"          fecha as date",
+						"     ),",
+						"     allowSchemaDrift: true,",
+						"     validateSchema: false,",
+						"     isolationLevel: 'READ_UNCOMMITTED',",
+						"     query: 'SELECT admission_date AS fecha\\nFROM silver.admissions\\nWHERE admission_date IS NOT NULL\\n\\nUNION\\n\\nSELECT discharge_date AS fecha\\nFROM silver.admissions\\nWHERE discharge_date IS NOT NULL\\n\\nUNION\\nSELECT payment_date AS fecha\\nFROM silver.billing\\nWHERE payment_date IS NOT NULL',",
+						"     format: 'query') ~> OrigenSilverFechas",
+						"OrigenSilverFechas derive(fecha_key = toInteger(toString(fecha, 'yyyyMMdd')),",
+						"          fecha_completa = fecha,",
+						"          anio = toShort(year(fecha)),",
+						"          trimestre = toShort(case(month(fecha) <= 3, 1, month(fecha) <= 6, 2, month(fecha) <= 9, 3, 4)),",
+						"          trimestre_nombre =      concat('T', toString(case(month(fecha) <= 3, 1, month(fecha) <= 6, 2, month(fecha) <= 9, 3, 4))),",
+						"          mes = toShort(month(fecha)),",
+						"          mes_nombre = array('Enero','Febrero','Marzo','Abril','Mayo','Junio','Julio','Agosto','Septiembre','Octubre','Noviembre','Diciembre')[month(fecha)],",
+						"          mes_corto = array('Ene','Feb','Mar','Abr','May','Jun','Jul','Ago','Sep','Oct','Nov','Dic')[month(fecha)],",
+						"          semana_anio = toShort(weekOfYear(fecha)),",
+						"          dia_mes = toShort(dayOfMonth(fecha)),",
+						"          dia_semana = toShort(iif(dayOfWeek(fecha) == 1, 7, dayOfWeek(fecha) - 1)),",
+						"          dia_nombre = array('Domingo','Lunes','Martes','Miércoles','Jueves','Viernes','Sábado')[dayOfWeek(fecha)],",
+						"          es_fin_de_semana = dayOfWeek(fecha) == 1 || dayOfWeek(fecha) == 7) ~> CrearColumnasDimFecha",
+						"CrearColumnasDimFecha sink(allowSchemaDrift: true,",
+						"     validateSchema: false,",
+						"     input(",
+						"          fecha_key as integer,",
+						"          fecha_completa as date,",
+						"          anio as integer,",
+						"          trimestre as integer,",
+						"          trimestre_nombre as string,",
+						"          mes as integer,",
+						"          mes_nombre as string,",
+						"          mes_corto as string,",
+						"          semana_anio as integer,",
+						"          dia_mes as integer,",
+						"          dia_semana as integer,",
+						"          dia_nombre as string,",
+						"          es_fin_de_semana as boolean",
+						"     ),",
+						"     deletable:false,",
+						"     insertable:true,",
+						"     updateable:false,",
+						"     upsertable:false,",
+						"     format: 'table',",
+						"     skipDuplicateMapInputs: true,",
+						"     skipDuplicateMapOutputs: true,",
+						"     errorHandlingOption: 'stopOnFirstError',",
+						"     mapColumn(",
+						"          fecha_key,",
+						"          fecha_completa,",
+						"          anio,",
+						"          trimestre,",
+						"          trimestre_nombre,",
+						"          mes,",
+						"          mes_nombre,",
+						"          mes_corto,",
+						"          semana_anio,",
+						"          dia_mes,",
+						"          dia_semana,",
+						"          dia_nombre,",
+						"          es_fin_de_semana",
+						"     )) ~> DestinoGoldDimFecha"
+					]
+				}
+			},
+			"dependsOn": []
+		},
+		{
+			"name": "[concat(parameters('factoryName'), '/DF_Gold_Dim_Paciente')]",
+			"type": "Microsoft.DataFactory/factories/dataflows",
+			"apiVersion": "2018-06-01",
+			"properties": {
+				"type": "MappingDataFlow",
+				"typeProperties": {
+					"sources": [
+						{
+							"dataset": {
+								"referenceName": "DS_Silver_Patients",
+								"type": "DatasetReference"
+							},
+							"name": "OrigenSilverPacientes"
+						}
+					],
+					"sinks": [
+						{
+							"dataset": {
+								"referenceName": "DS_Gold_Dim_Paciente",
+								"type": "DatasetReference"
+							},
+							"name": "DestinoGoldDimPaciente"
+						}
+					],
+					"transformations": [
+						{
+							"name": "DerivarEdad"
+						},
+						{
+							"name": "CrearColumnasDimPaciente"
+						},
+						{
+							"name": "ConvertirFechaNacimiento"
+						}
+					],
+					"scriptLines": [
+						"source(output(",
+						"          patient_id as string,",
+						"          full_name as string,",
+						"          gender as string,",
+						"          date_of_birth as string,",
+						"          phone as string,",
+						"          email as string,",
+						"          address as string,",
+						"          insurance_provider as string",
+						"     ),",
+						"     allowSchemaDrift: true,",
+						"     validateSchema: false,",
+						"     isolationLevel: 'READ_UNCOMMITTED',",
+						"     format: 'table') ~> OrigenSilverPacientes",
+						"ConvertirFechaNacimiento derive(edad = year(currentDate()) - year(date_of_birth) - iif(month(currentDate()) * 100 + dayOfMonth(currentDate()) < month(date_of_birth) * 100 + dayOfMonth(date_of_birth), 1, 0)) ~> DerivarEdad",
+						"DerivarEdad derive(patient_id_bk = toInteger(patient_id),",
+						"          nombre_completo = trim(full_name),",
+						"          genero = case(in(['m','male','masculino'], lower(trim(gender))), 'Masculino', in(['f','female','femenino'], lower(trim(gender))), 'Femenino', 'Otro'),",
+						"          fecha_nacimiento = date_of_birth,",
+						"          rango_etario = case(isNull(edad), toString(null()), edad <= 18, '0-18', edad <= 35, '19-35', edad <= 60, '36-60', '60+'),",
+						"          {correo_electronico } = trim(email),",
+						"          direccion = trim(address),",
+						"          proveedor_seguro = iif(isNull(insurance_provider), 'Sin seguro', iif(trim(insurance_provider) == '', 'Sin seguro', trim(insurance_provider)))) ~> CrearColumnasDimPaciente",
+						"OrigenSilverPacientes derive(date_of_birth = toDate(date_of_birth, 'yyyy-MM-dd')) ~> ConvertirFechaNacimiento",
+						"CrearColumnasDimPaciente sink(allowSchemaDrift: true,",
+						"     validateSchema: false,",
+						"     input(",
+						"          paciente_key as integer,",
+						"          patient_id_bk as integer,",
+						"          nombre_completo as string,",
+						"          genero as string,",
+						"          fecha_nacimiento as date,",
+						"          rango_etario as string,",
+						"          correo_electronico as string,",
+						"          direccion as string,",
+						"          proveedor_seguro as string",
+						"     ),",
+						"     deletable:false,",
+						"     insertable:true,",
+						"     updateable:false,",
+						"     upsertable:false,",
+						"     format: 'table',",
+						"     skipDuplicateMapInputs: true,",
+						"     skipDuplicateMapOutputs: true,",
+						"     errorHandlingOption: 'stopOnFirstError',",
+						"     mapColumn(",
+						"          patient_id_bk,",
+						"          nombre_completo,",
+						"          genero,",
+						"          fecha_nacimiento,",
+						"          rango_etario,",
+						"          correo_electronico = {correo_electronico },",
+						"          direccion,",
+						"          proveedor_seguro",
+						"     )) ~> DestinoGoldDimPaciente"
+					]
+				}
+			},
+			"dependsOn": []
+		},
+		{
+			"name": "[concat(parameters('factoryName'), '/PL_Silver_Patients')]",
+			"type": "Microsoft.DataFactory/factories/pipelines",
+			"apiVersion": "2018-06-01",
+			"properties": {
+				"activities": [
+					{
+						"name": "CargarSilverPatients",
+						"type": "ExecuteDataFlow",
+						"dependsOn": [],
+						"policy": {
+							"timeout": "0.12:00:00",
+							"retry": 0,
+							"retryIntervalInSeconds": 30,
+							"secureOutput": false,
+							"secureInput": false
+						},
+						"userProperties": [],
+						"typeProperties": {
+							"dataflow": {
+								"referenceName": "DF_Silver_Patients",
+								"type": "DataFlowReference",
+								"parameters": {},
+								"datasetParameters": {
+									"OrigenBronzePatients": {},
+									"DestinoSilverPatients": {}
+								}
+							},
+							"staging": {},
+							"compute": {
+								"coreCount": 8,
+								"computeType": "General"
+							},
+							"traceLevel": "Fine"
+						}
+					}
+				],
+				"policy": {
+					"elapsedTimeMetric": {}
+				},
+				"annotations": []
+			},
+			"dependsOn": []
+		},
+		{
+			"name": "[concat(parameters('factoryName'), '/PL_Silver_Admissions')]",
+			"type": "Microsoft.DataFactory/factories/pipelines",
+			"apiVersion": "2018-06-01",
+			"properties": {
+				"activities": [
+					{
+						"name": "CargarSilverAdmissions",
+						"type": "ExecuteDataFlow",
+						"dependsOn": [],
+						"policy": {
+							"timeout": "0.12:00:00",
+							"retry": 0,
+							"retryIntervalInSeconds": 30,
+							"secureOutput": false,
+							"secureInput": false
+						},
+						"userProperties": [],
+						"typeProperties": {
+							"dataflow": {
+								"referenceName": "DF_Silver_Admissions",
+								"type": "DataFlowReference",
+								"parameters": {},
+								"datasetParameters": {
+									"OrigenBronzeAdmissions": {},
+									"OrigenSilverPatients": {},
+									"DestinoSilverAdmissions": {}
+								}
+							},
+							"staging": {},
+							"compute": {
+								"coreCount": 8,
+								"computeType": "General"
+							},
+							"traceLevel": "Fine"
+						}
+					}
+				],
+				"policy": {
+					"elapsedTimeMetric": {}
+				},
+				"annotations": []
+			},
+			"dependsOn": []
+		},
+		{
+			"name": "[concat(parameters('factoryName'), '/PL_Silver_Diagnoses')]",
+			"type": "Microsoft.DataFactory/factories/pipelines",
+			"apiVersion": "2018-06-01",
+			"properties": {
+				"activities": [
+					{
+						"name": "CargarSilverDiagnoses",
+						"type": "ExecuteDataFlow",
+						"dependsOn": [],
+						"policy": {
+							"timeout": "0.12:00:00",
+							"retry": 0,
+							"retryIntervalInSeconds": 30,
+							"secureOutput": false,
+							"secureInput": false
+						},
+						"userProperties": [],
+						"typeProperties": {
+							"dataflow": {
+								"referenceName": "DF_Silver_Diagnoses",
+								"type": "DataFlowReference",
+								"parameters": {},
+								"datasetParameters": {
+									"OrigenBronzeDiagnoses": {},
+									"OrigenSilverAdmissions": {},
+									"DestinoSilverDiagnoses": {}
+								}
+							},
+							"staging": {},
+							"compute": {
+								"coreCount": 8,
+								"computeType": "General"
+							},
+							"traceLevel": "Fine"
+						}
+					}
+				],
+				"policy": {
+					"elapsedTimeMetric": {}
+				},
+				"annotations": []
+			},
+			"dependsOn": []
+		},
+		{
+			"name": "[concat(parameters('factoryName'), '/PL_Silver_Billing')]",
+			"type": "Microsoft.DataFactory/factories/pipelines",
+			"apiVersion": "2018-06-01",
+			"properties": {
+				"activities": [
+					{
+						"name": "CargarSilverBilling",
+						"type": "ExecuteDataFlow",
+						"dependsOn": [],
+						"policy": {
+							"timeout": "0.12:00:00",
+							"retry": 0,
+							"retryIntervalInSeconds": 30,
+							"secureOutput": false,
+							"secureInput": false
+						},
+						"userProperties": [],
+						"typeProperties": {
+							"dataflow": {
+								"referenceName": "DF_Silver_Billing",
+								"type": "DataFlowReference",
+								"parameters": {},
+								"datasetParameters": {
+									"OrigenBronzeBilling": {},
+									"OrigenSilverAdmissions": {},
+									"DestinoBilling": {}
+								}
+							},
+							"staging": {},
+							"compute": {
+								"coreCount": 8,
+								"computeType": "General"
+							},
+							"traceLevel": "Fine"
+						}
+					}
+				],
+				"policy": {
+					"elapsedTimeMetric": {}
+				},
+				"annotations": []
+			},
+			"dependsOn": [
+				"[concat(variables('factoryId'), '/dataflows/DF_Silver_Billing')]"
+			]
+		},
+		{
+			"name": "[concat(parameters('factoryName'), '/PL_Gold_Dim_Fecha')]",
+			"type": "Microsoft.DataFactory/factories/pipelines",
+			"apiVersion": "2018-06-01",
+			"properties": {
+				"activities": [
+					{
+						"name": "CargarDimFecha",
+						"type": "ExecuteDataFlow",
+						"dependsOn": [],
+						"policy": {
+							"timeout": "0.12:00:00",
+							"retry": 0,
+							"retryIntervalInSeconds": 30,
+							"secureOutput": false,
+							"secureInput": false
+						},
+						"userProperties": [],
+						"typeProperties": {
+							"dataflow": {
+								"referenceName": "DF_Gold_Dim_Fecha",
+								"type": "DataFlowReference",
+								"parameters": {},
+								"datasetParameters": {
+									"OrigenSilverFechas": {},
+									"DestinoGoldDimFecha": {}
+								}
+							},
+							"staging": {},
+							"compute": {
+								"coreCount": 8,
+								"computeType": "General"
+							},
+							"traceLevel": "Fine"
+						}
+					}
+				],
+				"policy": {
+					"elapsedTimeMetric": {}
+				},
+				"annotations": []
+			},
+			"dependsOn": [
+				"[concat(variables('factoryId'), '/dataflows/DF_Gold_Dim_Fecha')]"
+			]
+		},
+		{
+			"name": "[concat(parameters('factoryName'), '/PL_Gold_Dim_Paciente')]",
+			"type": "Microsoft.DataFactory/factories/pipelines",
+			"apiVersion": "2018-06-01",
+			"properties": {
+				"activities": [
+					{
+						"name": "CargarDimPaciente",
+						"type": "ExecuteDataFlow",
+						"dependsOn": [],
+						"policy": {
+							"timeout": "0.12:00:00",
+							"retry": 0,
+							"retryIntervalInSeconds": 30,
+							"secureOutput": false,
+							"secureInput": false
+						},
+						"userProperties": [],
+						"typeProperties": {
+							"dataflow": {
+								"referenceName": "DF_Gold_Dim_Paciente",
+								"type": "DataFlowReference",
+								"parameters": {},
+								"datasetParameters": {
+									"OrigenSilverPacientes": {},
+									"DestinoGoldDimPaciente": {}
+								}
+							},
+							"staging": {},
+							"compute": {
+								"coreCount": 8,
+								"computeType": "General"
+							},
+							"traceLevel": "Fine"
+						}
+					}
+				],
+				"policy": {
+					"elapsedTimeMetric": {}
+				},
+				"annotations": []
+			},
+			"dependsOn": [
+				"[concat(variables('factoryId'), '/dataflows/DF_Gold_Dim_Paciente')]"
+			]
+		}
+	]
+}
