@@ -186,6 +186,9 @@
 					"transformations": [
 						{
 							"name": "LimpiarPacientes"
+						},
+						{
+							"name": "EliminarDuplicadosPatients"
 						}
 					],
 					"scriptLines": [
@@ -211,7 +214,15 @@
 						"          email = lower(trim(email)),",
 						"          address = trim(address),",
 						"          insurance_provider = trim(insurance_provider)) ~> LimpiarPacientes",
-						"LimpiarPacientes sink(allowSchemaDrift: true,",
+						"LimpiarPacientes aggregate(groupBy(patient_id),",
+						"     full_name = first(full_name),",
+						"          gender = first(gender),",
+						"          date_of_birth = first(date_of_birth),",
+						"          phone = first(phone),",
+						"          email = first(email),",
+						"          address = first(address),",
+						"          insurance_provider = first(insurance_provider)) ~> EliminarDuplicadosPatients",
+						"EliminarDuplicadosPatients sink(allowSchemaDrift: true,",
 						"     validateSchema: false,",
 						"     input(",
 						"          patient_id as string,",
