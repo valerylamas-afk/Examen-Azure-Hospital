@@ -42,7 +42,7 @@
 			}
 		],
 		"typeProperties": {
-			"schema": "bronze",
+			"schema": "silver",
 			"table": "patients"
 		}
 	}
