@@ -1,0 +1,47 @@
+{
+	"name": "DF_Silver_Patients",
+	"properties": {
+		"type": "MappingDataFlow",
+		"typeProperties": {
+			"sources": [
+				{
+					"dataset": {
+						"referenceName": "DS_Bronze_Patients",
+						"type": "DatasetReference"
+					},
+					"name": "OrigenBronzePatients"
+				}
+			],
+			"sinks": [],
+			"transformations": [
+				{
+					"name": "LimpiarPacientes"
+				}
+			],
+			"scriptLines": [
+				"source(output(",
+				"          patient_id as string,",
+				"          full_name as string,",
+				"          gender as string,",
+				"          date_of_birth as string,",
+				"          phone as string,",
+				"          email as string,",
+				"          address as string,",
+				"          insurance_provider as string",
+				"     ),",
+				"     allowSchemaDrift: true,",
+				"     validateSchema: false,",
+				"     isolationLevel: 'READ_UNCOMMITTED',",
+				"     format: 'table') ~> OrigenBronzePatients",
+				"OrigenBronzePatients derive(patient_id = toInteger(patient_id),",
+				"          full_name = trim(full_name),",
+				"          gender = iif(     lower(trim(gender)) == 'm' || lower(trim(gender)) == 'male',     'M',     iif(         lower(trim(gender)) == 'f' || lower(trim(gender)) == 'female',         'F',         gender     ) ),",
+				"          date_of_birth = toDate(date_of_birth),",
+				"          phone = trim(phone),",
+				"          email = lower(trim(email)),",
+				"          address = trim(address),",
+				"          insurance_provider = trim(insurance_provider)) ~> LimpiarPacientes"
+			]
+		}
+	}
+}
