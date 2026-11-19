@@ -12,7 +12,15 @@
 					"name": "OrigenBronzePatients"
 				}
 			],
-			"sinks": [],
+			"sinks": [
+				{
+					"dataset": {
+						"referenceName": "DS_Silver_Patients",
+						"type": "DatasetReference"
+					},
+					"name": "DestinoSilverPatients"
+				}
+			],
 			"transformations": [
 				{
 					"name": "LimpiarPacientes"
@@ -40,7 +48,37 @@
 				"          phone = trim(phone),",
 				"          email = lower(trim(email)),",
 				"          address = trim(address),",
-				"          insurance_provider = trim(insurance_provider)) ~> LimpiarPacientes"
+				"          insurance_provider = trim(insurance_provider)) ~> LimpiarPacientes",
+				"LimpiarPacientes sink(allowSchemaDrift: true,",
+				"     validateSchema: false,",
+				"     input(",
+				"          patient_id as string,",
+				"          full_name as string,",
+				"          gender as string,",
+				"          date_of_birth as string,",
+				"          phone as string,",
+				"          email as string,",
+				"          address as string,",
+				"          insurance_provider as string",
+				"     ),",
+				"     deletable:false,",
+				"     insertable:true,",
+				"     updateable:false,",
+				"     upsertable:false,",
+				"     format: 'table',",
+				"     skipDuplicateMapInputs: true,",
+				"     skipDuplicateMapOutputs: true,",
+				"     errorHandlingOption: 'stopOnFirstError',",
+				"     mapColumn(",
+				"          patient_id,",
+				"          full_name,",
+				"          gender,",
+				"          date_of_birth,",
+				"          phone,",
+				"          email,",
+				"          address,",
+				"          insurance_provider",
+				"     )) ~> DestinoSilverPatients"
 			]
 		}
 	}
