@@ -1,0 +1,78 @@
+{
+	"name": "DF_Gold_Fact_Admisiones",
+	"properties": {
+		"type": "MappingDataFlow",
+		"typeProperties": {
+			"sources": [
+				{
+					"dataset": {
+						"referenceName": "DS_Silver_Admissions",
+						"type": "DatasetReference"
+					},
+					"name": "OrigenFactAdmisiones"
+				}
+			],
+			"sinks": [
+				{
+					"dataset": {
+						"referenceName": "DS_Gold_Fact_Admisiones",
+						"type": "DatasetReference"
+					},
+					"name": "DestinoGoldFactAdmisiones"
+				}
+			],
+			"transformations": [],
+			"scriptLines": [
+				"source(output(",
+				"          admission_id_bk as integer,",
+				"          paciente_key as integer,",
+				"          departamento_key as integer,",
+				"          diagnostico_key as integer,",
+				"          fecha_ingreso_key as integer,",
+				"          fecha_alta_key as integer,",
+				"          medico_id as integer,",
+				"          dias_estancia as integer,",
+				"          conteo_admisiones as integer",
+				"     ),",
+				"     allowSchemaDrift: true,",
+				"     validateSchema: false,",
+				"     isolationLevel: 'READ_UNCOMMITTED',",
+				"     query: 'SELECT\\n    a.admission_id AS admission_id_bk,\\n    p.paciente_key,\\n    dep.departamento_key,\\n    CASE WHEN d.diagnosis_id IS NULL\\n         THEN sd.diagnostico_key\\n         ELSE dx.diagnostico_key\\n    END AS diagnostico_key,\\n    CONVERT(int, CONVERT(char(8), a.admission_date, 112)) AS fecha_ingreso_key,\\n    CONVERT(int, CONVERT(char(8), a.discharge_date, 112)) AS fecha_alta_key,\\n    a.attending_doctor_id AS medico_id,\\n    DATEDIFF(day, a.admission_date, a.discharge_date) AS dias_estancia,\\n    1 AS conteo_admisiones\\nFROM silver.admissions AS a\\nLEFT JOIN gold.dim_paciente AS p\\n    ON p.patient_id_bk = a.patient_id\\nLEFT JOIN gold.dim_departamento AS dep\\n    ON dep.nombre_departamento = TRIM(a.department)\\nOUTER APPLY (\\n    SELECT TOP (1) diagnosis_id, icd_code, diagnosis_description, severity\\n    FROM silver.diagnoses\\n    WHERE admission_id = a.admission_id\\n      AND NULLIF(TRIM(icd_code), \\'\\') IS NOT NULL\\n    ORDER BY diagnosis_id\\n) AS d\\nLEFT JOIN gold.dim_diagnostico AS dx\\n    ON dx.codigo_icd = TRIM(d.icd_code)\\n   AND dx.nivel_severidad = COALESCE(NULLIF(TRIM(d.severity), \\'\\'), \\'Sin especificar\\')\\n   AND (\\n       dx.descripcion_patologia = NULLIF(TRIM(d.diagnosis_description), \\'\\')\\n       OR (dx.descripcion_patologia IS NULL\\n           AND NULLIF(TRIM(d.diagnosis_description), \\'\\') IS NULL)\\n   )\\nLEFT JOIN gold.dim_diagnostico AS sd\\n    ON sd.codigo_icd = \\'SIN_DIAGNOSTICO\\'',",
+				"     format: 'query') ~> OrigenFactAdmisiones",
+				"OrigenFactAdmisiones sink(allowSchemaDrift: true,",
+				"     validateSchema: false,",
+				"     input(",
+				"          admision_key as long,",
+				"          admission_id_bk as integer,",
+				"          paciente_key as integer,",
+				"          departamento_key as integer,",
+				"          diagnostico_key as integer,",
+				"          fecha_ingreso_key as integer,",
+				"          fecha_alta_key as integer,",
+				"          medico_id as integer,",
+				"          dias_estancia as integer,",
+				"          conteo_admisiones as integer",
+				"     ),",
+				"     deletable:false,",
+				"     insertable:true,",
+				"     updateable:false,",
+				"     upsertable:false,",
+				"     format: 'table',",
+				"     skipDuplicateMapInputs: true,",
+				"     skipDuplicateMapOutputs: true,",
+				"     errorHandlingOption: 'stopOnFirstError',",
+				"     mapColumn(",
+				"          admission_id_bk,",
+				"          paciente_key,",
+				"          departamento_key,",
+				"          diagnostico_key,",
+				"          fecha_ingreso_key,",
+				"          fecha_alta_key,",
+				"          medico_id,",
+				"          dias_estancia,",
+				"          conteo_admisiones",
+				"     )) ~> DestinoGoldFactAdmisiones"
+			]
+		}
+	}
+}

@@ -9,13 +9,54 @@
 		"type": "AzureSqlTable",
 		"schema": [
 			{
+				"name": "admision_key",
+				"type": "bigint",
+				"precision": 19
+			},
+			{
+				"name": "admission_id_bk",
+				"type": "int",
+				"precision": 10
+			},
+			{
+				"name": "paciente_key",
+				"type": "int",
+				"precision": 10
+			},
+			{
 				"name": "departamento_key",
 				"type": "int",
 				"precision": 10
 			},
 			{
-				"name": "nombre_departamento",
-				"type": "nvarchar"
+				"name": "diagnostico_key",
+				"type": "int",
+				"precision": 10
+			},
+			{
+				"name": "fecha_ingreso_key",
+				"type": "int",
+				"precision": 10
+			},
+			{
+				"name": "fecha_alta_key",
+				"type": "int",
+				"precision": 10
+			},
+			{
+				"name": "medico_id",
+				"type": "int",
+				"precision": 10
+			},
+			{
+				"name": "dias_estancia",
+				"type": "int",
+				"precision": 10
+			},
+			{
+				"name": "conteo_admisiones",
+				"type": "int",
+				"precision": 10
 			}
 		],
 		"typeProperties": {
