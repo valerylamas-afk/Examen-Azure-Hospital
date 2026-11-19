@@ -1,0 +1,94 @@
+{
+	"name": "DF_Gold_Dim_Fecha",
+	"properties": {
+		"type": "MappingDataFlow",
+		"typeProperties": {
+			"sources": [
+				{
+					"dataset": {
+						"referenceName": "DS_Silver_Admissions_Gold",
+						"type": "DatasetReference"
+					},
+					"name": "OrigenSilverFechas"
+				}
+			],
+			"sinks": [
+				{
+					"dataset": {
+						"referenceName": "DS_Gold_Dim_Fecha",
+						"type": "DatasetReference"
+					},
+					"name": "DestinoGoldDimFecha"
+				}
+			],
+			"transformations": [
+				{
+					"name": "CrearColumnasDimFecha"
+				}
+			],
+			"scriptLines": [
+				"source(output(",
+				"          fecha as date",
+				"     ),",
+				"     allowSchemaDrift: true,",
+				"     validateSchema: false,",
+				"     isolationLevel: 'READ_UNCOMMITTED',",
+				"     query: 'SELECT admission_date AS fecha\\nFROM silver.admissions\\nWHERE admission_date IS NOT NULL\\n\\nUNION\\n\\nSELECT discharge_date AS fecha\\nFROM silver.admissions\\nWHERE discharge_date IS NOT NULL\\n\\nUNION\\nSELECT payment_date AS fecha\\nFROM silver.billing\\nWHERE payment_date IS NOT NULL',",
+				"     format: 'query') ~> OrigenSilverFechas",
+				"OrigenSilverFechas derive(fecha_key = toInteger(toString(fecha, 'yyyyMMdd')),",
+				"          fecha_completa = fecha,",
+				"          anio = toShort(year(fecha)),",
+				"          trimestre = toShort(case(month(fecha) <= 3, 1, month(fecha) <= 6, 2, month(fecha) <= 9, 3, 4)),",
+				"          trimestre_nombre =      concat('T', toString(case(month(fecha) <= 3, 1, month(fecha) <= 6, 2, month(fecha) <= 9, 3, 4))),",
+				"          mes = toShort(month(fecha)),",
+				"          mes_nombre = array('Enero','Febrero','Marzo','Abril','Mayo','Junio','Julio','Agosto','Septiembre','Octubre','Noviembre','Diciembre')[month(fecha)],",
+				"          mes_corto = array('Ene','Feb','Mar','Abr','May','Jun','Jul','Ago','Sep','Oct','Nov','Dic')[month(fecha)],",
+				"          semana_anio = toShort(weekOfYear(fecha)),",
+				"          dia_mes = toShort(dayOfMonth(fecha)),",
+				"          dia_semana = toShort(iif(dayOfWeek(fecha) == 1, 7, dayOfWeek(fecha) - 1)),",
+				"          dia_nombre = array('Domingo','Lunes','Martes','Miércoles','Jueves','Viernes','Sábado')[dayOfWeek(fecha)],",
+				"          es_fin_de_semana = dayOfWeek(fecha) == 1 || dayOfWeek(fecha) == 7) ~> CrearColumnasDimFecha",
+				"CrearColumnasDimFecha sink(allowSchemaDrift: true,",
+				"     validateSchema: false,",
+				"     input(",
+				"          fecha_key as integer,",
+				"          fecha_completa as date,",
+				"          anio as integer,",
+				"          trimestre as integer,",
+				"          trimestre_nombre as string,",
+				"          mes as integer,",
+				"          mes_nombre as string,",
+				"          mes_corto as string,",
+				"          semana_anio as integer,",
+				"          dia_mes as integer,",
+				"          dia_semana as integer,",
+				"          dia_nombre as string,",
+				"          es_fin_de_semana as boolean",
+				"     ),",
+				"     deletable:false,",
+				"     insertable:true,",
+				"     updateable:false,",
+				"     upsertable:false,",
+				"     format: 'table',",
+				"     skipDuplicateMapInputs: true,",
+				"     skipDuplicateMapOutputs: true,",
+				"     errorHandlingOption: 'stopOnFirstError',",
+				"     mapColumn(",
+				"          fecha_key,",
+				"          fecha_completa,",
+				"          anio,",
+				"          trimestre,",
+				"          trimestre_nombre,",
+				"          mes,",
+				"          mes_nombre,",
+				"          mes_corto,",
+				"          semana_anio,",
+				"          dia_mes,",
+				"          dia_semana,",
+				"          dia_nombre,",
+				"          es_fin_de_semana",
+				"     )) ~> DestinoGoldDimFecha"
+			]
+		}
+	}
+}
