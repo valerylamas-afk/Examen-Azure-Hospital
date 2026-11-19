@@ -1,0 +1,112 @@
+{
+	"name": "DF_Silver_Admissions",
+	"properties": {
+		"type": "MappingDataFlow",
+		"typeProperties": {
+			"sources": [
+				{
+					"dataset": {
+						"referenceName": "DS_Bronze_Admissions",
+						"type": "DatasetReference"
+					},
+					"name": "OrigenBronzeAdmissions"
+				},
+				{
+					"dataset": {
+						"referenceName": "DS_Silver_Patients",
+						"type": "DatasetReference"
+					},
+					"name": "OrigenSilverPatients"
+				}
+			],
+			"sinks": [
+				{
+					"dataset": {
+						"referenceName": "DS_Silver_Admissions",
+						"type": "DatasetReference"
+					},
+					"name": "DestinoSilverAdmissions"
+				}
+			],
+			"transformations": [
+				{
+					"name": "LimpiarAdmissions"
+				},
+				{
+					"name": "FiltrarAdmissions"
+				},
+				{
+					"name": "ValidarPacienteAdmissions"
+				},
+				{
+					"name": "ConvertirIdPaciente"
+				}
+			],
+			"scriptLines": [
+				"source(output(",
+				"          admission_id as string,",
+				"          patient_id as string,",
+				"          admission_date as string,",
+				"          discharge_date as string,",
+				"          department as string,",
+				"          attending_doctor_id as string",
+				"     ),",
+				"     allowSchemaDrift: true,",
+				"     validateSchema: false,",
+				"     isolationLevel: 'READ_UNCOMMITTED',",
+				"     format: 'table') ~> OrigenBronzeAdmissions",
+				"source(output(",
+				"          patient_id as string,",
+				"          full_name as string,",
+				"          gender as string,",
+				"          date_of_birth as string,",
+				"          phone as string,",
+				"          email as string,",
+				"          address as string,",
+				"          insurance_provider as string",
+				"     ),",
+				"     allowSchemaDrift: true,",
+				"     validateSchema: false,",
+				"     isolationLevel: 'READ_UNCOMMITTED',",
+				"     format: 'table') ~> OrigenSilverPatients",
+				"OrigenBronzeAdmissions derive(admission_id = toInteger(admission_id),",
+				"          patient_id = toInteger(patient_id),",
+				"          admission_date =  iif(     regexMatch(trim(admission_date), '^[0-9]{2}-[0-9]{2}-[0-9]{2}$'),     toDate(         concat(             '20',             right(trim(admission_date), 2),             '-',             left(trim(admission_date), 2),             '-',             substring(trim(admission_date), 4, 2)         ),         'yyyy-MM-dd'     ),     coalesce(         toDate(admission_date, 'yyyy-MM-dd'),         toDate(admission_date, 'MM/dd/yyyy'),         toDate(admission_date, 'MM-dd-yyyy'),         toDate(admission_date, 'dd-MMM-yyyy'),         toDate(admission_date, 'MMMM dd, yyyy')     ) ),",
+				"          discharge_date =  iif(     regexMatch(trim(discharge_date), '^[0-9]{2}-[0-9]{2}-[0-9]{2}$'),     toDate(         concat(             '20',             right(trim(discharge_date), 2),             '-',             left(trim(discharge_date), 2),             '-',             substring(trim(discharge_date), 4, 2)         ),         'yyyy-MM-dd'     ),     coalesce(         toDate(discharge_date, 'yyyy-MM-dd'),         toDate(discharge_date, 'MM/dd/yyyy'),         toDate(discharge_date, 'MM-dd-yyyy'),         toDate(discharge_date, 'dd-MMM-yyyy'),         toDate(discharge_date, 'MMMM dd, yyyy')     ) ),",
+				"          department = trim(department),",
+				"          attending_doctor_id = toInteger(attending_doctor_id)) ~> LimpiarAdmissions",
+				"LimpiarAdmissions filter(!isNull(patient_id) && !isNull(admission_date)) ~> FiltrarAdmissions",
+				"FiltrarAdmissions, ConvertirIdPaciente exists(LimpiarAdmissions@patient_id == ConvertirIdPaciente@patient_id,",
+				"     negate:false,",
+				"     broadcast: 'auto')~> ValidarPacienteAdmissions",
+				"OrigenSilverPatients derive(patient_id = toInteger(patient_id)) ~> ConvertirIdPaciente",
+				"ValidarPacienteAdmissions sink(allowSchemaDrift: true,",
+				"     validateSchema: false,",
+				"     input(",
+				"          admission_id as integer,",
+				"          patient_id as integer,",
+				"          admission_date as date,",
+				"          discharge_date as date,",
+				"          department as string,",
+				"          attending_doctor_id as integer",
+				"     ),",
+				"     deletable:false,",
+				"     insertable:true,",
+				"     updateable:false,",
+				"     upsertable:false,",
+				"     format: 'table',",
+				"     skipDuplicateMapInputs: true,",
+				"     skipDuplicateMapOutputs: true,",
+				"     errorHandlingOption: 'stopOnFirstError',",
+				"     mapColumn(",
+				"          admission_id,",
+				"          patient_id,",
+				"          admission_date,",
+				"          discharge_date,",
+				"          department,",
+				"          attending_doctor_id",
+				"     )) ~> DestinoSilverAdmissions"
+			]
+		}
+	}
+}

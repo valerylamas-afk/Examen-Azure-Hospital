@@ -1,0 +1,41 @@
+{
+	"name": "DS_Bronze_Admissions",
+	"properties": {
+		"linkedServiceName": {
+			"referenceName": "LS_AzureSQL_Hospital",
+			"type": "LinkedServiceReference"
+		},
+		"annotations": [],
+		"type": "AzureSqlTable",
+		"schema": [
+			{
+				"name": "admission_id",
+				"type": "nvarchar"
+			},
+			{
+				"name": "patient_id",
+				"type": "nvarchar"
+			},
+			{
+				"name": "admission_date",
+				"type": "nvarchar"
+			},
+			{
+				"name": "discharge_date",
+				"type": "nvarchar"
+			},
+			{
+				"name": "department",
+				"type": "nvarchar"
+			},
+			{
+				"name": "attending_doctor_id",
+				"type": "nvarchar"
+			}
+		],
+		"typeProperties": {
+			"schema": "bronze",
+			"table": "admissions"
+		}
+	}
+}
