@@ -1,0 +1,110 @@
+{
+	"name": "DF_Silver_Billing",
+	"properties": {
+		"type": "MappingDataFlow",
+		"typeProperties": {
+			"sources": [
+				{
+					"dataset": {
+						"referenceName": "DS_Bronze_Billing",
+						"type": "DatasetReference"
+					},
+					"name": "OrigenBronzeBilling"
+				},
+				{
+					"dataset": {
+						"referenceName": "DS_Silver_Admissions",
+						"type": "DatasetReference"
+					},
+					"name": "OrigenSilverAdmissions"
+				}
+			],
+			"sinks": [
+				{
+					"dataset": {
+						"referenceName": "DS_Silver_Billing",
+						"type": "DatasetReference"
+					},
+					"name": "DestinoBilling"
+				}
+			],
+			"transformations": [
+				{
+					"name": "LimpiarBilling"
+				},
+				{
+					"name": "FiltrarBilling"
+				},
+				{
+					"name": "ValidarAdmissionBilling"
+				}
+			],
+			"scriptLines": [
+				"source(output(",
+				"          billing_id as string,",
+				"          admission_id as string,",
+				"          charge_type as string,",
+				"          amount as string,",
+				"          payment_status as string,",
+				"          payment_date as string",
+				"     ),",
+				"     allowSchemaDrift: true,",
+				"     validateSchema: false,",
+				"     isolationLevel: 'READ_UNCOMMITTED',",
+				"     format: 'table') ~> OrigenBronzeBilling",
+				"source(output(",
+				"          admission_id as integer,",
+				"          patient_id as integer,",
+				"          admission_date as date,",
+				"          discharge_date as date,",
+				"          department as string,",
+				"          attending_doctor_id as integer",
+				"     ),",
+				"     allowSchemaDrift: true,",
+				"     validateSchema: false,",
+				"     isolationLevel: 'READ_UNCOMMITTED',",
+				"     format: 'table') ~> OrigenSilverAdmissions",
+				"OrigenBronzeBilling derive(billing_id = toInteger(billing_id),",
+				"          admission_id = toInteger(admission_id),",
+				"          charge_type = trim(charge_type),",
+				"          payment_status = upper(trim(payment_status)),",
+				"          amount = toDecimal(     replace(         replace(             replace(                 replace(trim(amount), 'USD', ''),                 '$', ''             ),             ',', ''         ),         ' ', ''     ),     18,     2 ),",
+				"          {payment_date¿} = iif(     isNull(payment_date),     toDate(null()),     iif(         regexMatch(payment_date, '^[0-9]{4}-[0-9]{2}-[0-9]{2}$'),         toDate(payment_date, 'yyyy-MM-dd'),         iif(             regexMatch(payment_date, '^[0-9]{2}/[0-9]{2}/[0-9]{4}$'),             toDate(payment_date, 'MM/dd/yyyy'),             iif(                 regexMatch(payment_date, '^[0-9]{2}-[0-9]{2}-[0-9]{2}$'),                 toDate(payment_date, 'MM-dd-yy'),                 iif(                     regexMatch(payment_date, '^[0-9]{2}-[A-Za-z]{3}-[0-9]{4}$'),                     toDate(payment_date, 'dd-MMM-yyyy'),                     toDate(payment_date, 'MMMM dd, yyyy')                 )             )         )     ) )) ~> LimpiarBilling",
+				"LimpiarBilling filter(!isNull(billing_id)",
+				"&& !isNull(admission_id)",
+				"&& !isNull(amount)",
+				"&& !isNull(charge_type)",
+				"&& !isNull(payment_status)) ~> FiltrarBilling",
+				"FiltrarBilling, OrigenSilverAdmissions exists(LimpiarBilling@admission_id == OrigenSilverAdmissions@admission_id,",
+				"     negate:false,",
+				"     broadcast: 'auto')~> ValidarAdmissionBilling",
+				"ValidarAdmissionBilling sink(allowSchemaDrift: true,",
+				"     validateSchema: false,",
+				"     input(",
+				"          billing_id as integer,",
+				"          admission_id as integer,",
+				"          charge_type as string,",
+				"          amount as decimal(12,2),",
+				"          payment_status as string,",
+				"          payment_date as date",
+				"     ),",
+				"     deletable:false,",
+				"     insertable:true,",
+				"     updateable:false,",
+				"     upsertable:false,",
+				"     format: 'table',",
+				"     skipDuplicateMapInputs: true,",
+				"     skipDuplicateMapOutputs: true,",
+				"     errorHandlingOption: 'stopOnFirstError',",
+				"     mapColumn(",
+				"          billing_id,",
+				"          admission_id,",
+				"          charge_type,",
+				"          amount,",
+				"          payment_status,",
+				"          payment_date = {payment_date¿}",
+				"     )) ~> DestinoBilling"
+			]
+		}
+	}
+}

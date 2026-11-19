@@ -1,0 +1,45 @@
+{
+	"name": "DS_Silver_Billing",
+	"properties": {
+		"linkedServiceName": {
+			"referenceName": "LS_AzureSQL_Hospital",
+			"type": "LinkedServiceReference"
+		},
+		"annotations": [],
+		"type": "AzureSqlTable",
+		"schema": [
+			{
+				"name": "billing_id",
+				"type": "int",
+				"precision": 10
+			},
+			{
+				"name": "admission_id",
+				"type": "int",
+				"precision": 10
+			},
+			{
+				"name": "charge_type",
+				"type": "varchar"
+			},
+			{
+				"name": "amount",
+				"type": "decimal",
+				"precision": 12,
+				"scale": 2
+			},
+			{
+				"name": "payment_status",
+				"type": "varchar"
+			},
+			{
+				"name": "payment_date",
+				"type": "date"
+			}
+		],
+		"typeProperties": {
+			"schema": "silver",
+			"table": "billing"
+		}
+	}
+}

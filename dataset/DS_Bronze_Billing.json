@@ -1,0 +1,41 @@
+{
+	"name": "DS_Bronze_Billing",
+	"properties": {
+		"linkedServiceName": {
+			"referenceName": "LS_AzureSQL_Hospital",
+			"type": "LinkedServiceReference"
+		},
+		"annotations": [],
+		"type": "AzureSqlTable",
+		"schema": [
+			{
+				"name": "billing_id",
+				"type": "nvarchar"
+			},
+			{
+				"name": "admission_id",
+				"type": "nvarchar"
+			},
+			{
+				"name": "charge_type",
+				"type": "nvarchar"
+			},
+			{
+				"name": "amount",
+				"type": "nvarchar"
+			},
+			{
+				"name": "payment_status",
+				"type": "nvarchar"
+			},
+			{
+				"name": "payment_date",
+				"type": "nvarchar"
+			}
+		],
+		"typeProperties": {
+			"schema": "bronze",
+			"table": "billing"
+		}
+	}
+}
