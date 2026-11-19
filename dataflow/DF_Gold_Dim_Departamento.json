@@ -1,0 +1,51 @@
+{
+	"name": "DF_Gold_Dim_Departamento",
+	"properties": {
+		"type": "MappingDataFlow",
+		"typeProperties": {
+			"sources": [
+				{
+					"dataset": {
+						"referenceName": "DS_Silver_Admissions",
+						"type": "DatasetReference"
+					},
+					"name": "OrigenSilverDepartamentos"
+				}
+			],
+			"sinks": [
+				{
+					"dataset": {
+						"referenceName": "DS_Gold_Dim_Departamento",
+						"type": "DatasetReference"
+					},
+					"name": "DestinoGoldDimDepartamento"
+				}
+			],
+			"transformations": [],
+			"scriptLines": [
+				"source(output(",
+				"          nombre_departamento as string",
+				"     ),",
+				"     allowSchemaDrift: true,",
+				"     validateSchema: false,",
+				"     isolationLevel: 'READ_UNCOMMITTED',",
+				"     query: 'SELECT DISTINCT TRIM(department) AS nombre_departamento\\nFROM silver.admissions\\nWHERE NULLIF(TRIM(department), \\'\\') IS NOT NULL',",
+				"     format: 'query') ~> OrigenSilverDepartamentos",
+				"OrigenSilverDepartamentos sink(allowSchemaDrift: true,",
+				"     validateSchema: false,",
+				"     input(",
+				"          departamento_key as integer,",
+				"          nombre_departamento as string",
+				"     ),",
+				"     deletable:false,",
+				"     insertable:true,",
+				"     updateable:false,",
+				"     upsertable:false,",
+				"     format: 'table',",
+				"     skipDuplicateMapInputs: true,",
+				"     skipDuplicateMapOutputs: true,",
+				"     errorHandlingOption: 'stopOnFirstError') ~> DestinoGoldDimDepartamento"
+			]
+		}
+	}
+}
