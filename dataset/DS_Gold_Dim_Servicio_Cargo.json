@@ -9,13 +9,17 @@
 		"type": "AzureSqlTable",
 		"schema": [
 			{
-				"name": "departamento_key",
+				"name": "servicio_cargo_key",
 				"type": "int",
 				"precision": 10
 			},
 			{
-				"name": "nombre_departamento",
-				"type": "nvarchar"
+				"name": "tipo_cargo",
+				"type": "varchar"
+			},
+			{
+				"name": "estado_pago",
+				"type": "varchar"
 			}
 		],
 		"typeProperties": {
